@@ -73,6 +73,7 @@ var APIready = new Promise(function(resolve) {
                     var playerTag = document.createElement('div');
                     playerTag.id = vidId;
                     playerTag.style.position = 'absolute';
+                    playerTag.style.zIndex = '1';
                     childThumb.insertBefore(playerTag, childThumb.firstChild);
                     APIready.then(function () {
                         var pplayer = new YT.Player(playerTag.id, {
