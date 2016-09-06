@@ -1,6 +1,7 @@
 // ==UserScript==
 // @name         YouTube Preview
-// @namespace    http://tampermonkey.net/
+// @namespace    https://github.com/sooqua/
+// @downloadURL  https://raw.githubusercontent.com/sooqua/YouTube-Preview/master/YouTubePreview.user.js
 // @version      0.1
 // @description  Preview youtube thumbnail
 // @match        *://*.youtube.com/*
