@@ -2,10 +2,11 @@
 // @name         YouTube Preview
 // @namespace    https://github.com/sooqua/
 // @downloadURL  https://raw.githubusercontent.com/sooqua/YouTube-Preview/master/YouTubePreview.user.js
-// @version      0.2
+// @version      0.3
 // @description  Preview youtube thumbnail
 // @match        *://*.youtube.com/*
 // @run-at       document-end
+// @grant        GM_addStyle
 // ==/UserScript==
 
 var APIready = new Promise(function(resolve) {
@@ -14,6 +15,30 @@ var APIready = new Promise(function(resolve) {
 
 (function() {
     'use strict';
+
+    GM_addStyle(".player-api { z-index: 1 !important; }");
+    GM_addStyle(".yt-lockup-thumbnail,.thumb-wrapper { " +
+        "-webkit-transition: all 200ms ease-in !important; " +
+        "-webkit-transform: scale(1) !important; " +
+        "-ms-transition: all 200ms ease-in !important; " +
+        "-ms-transform: scale(1) !important; " +
+        "-moz-transition: all 200ms ease-in !important; " +
+        "-moz-transform: scale(1) !important; " +
+        "transition: all 200ms ease-in !important; " +
+        "transform: scale(1) !important; " +
+        "}");
+    GM_addStyle(".yt-lockup-thumbnail:hover,.thumb-wrapper:hover { " +
+        "z-index: 2147483647 !important; " +
+        "box-shadow: 0px 0px 100px #000000 !important; " +
+        "-webkit-transition: all 200ms ease-in !important; " +
+        "-webkit-transform: scale(2.0) !important; " +
+        "-ms-transition: all 200ms ease-in !important; " +
+        "-ms-transform: scale(2.0) !important; " +
+        "-moz-transition: all 200ms ease-in !important; " +
+        "-moz-transform: scale(2.0) !important; " +
+        "transition: all 200ms ease-in !important; " +
+        "transform: scale(2.0) !important; " +
+        "}");
 
     function init() {
         // requesting api
@@ -155,13 +180,15 @@ var APIready = new Promise(function(resolve) {
 
                     if(thumbnail.PPlayer) {
                         thumbnail.PPlayer.then(function(PPlayer) {
-                            PPlayer.a.parentNode.removeChild(PPlayer.a);
+                            if(PPlayer.a)
+                                PPlayer.a.parentNode.removeChild(PPlayer.a);
                             thumbnail.PPlayer = null;
                         });
                     }
                     if(thumbnail.HPlayer) {
                         thumbnail.HPlayer.then(function (HPlayer) {
-                            HPlayer.parentNode.removeChild(HPlayer);
+                            if(HPlayer)
+                                HPlayer.parentNode.removeChild(HPlayer);
                             HPlayer = null;
                         });
                     }
