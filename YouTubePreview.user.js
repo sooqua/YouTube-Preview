@@ -3,59 +3,19 @@
 // @author       sooqua
 // @namespace    https://github.com/sooqua/
 // @downloadURL  https://raw.githubusercontent.com/sooqua/YouTube-Preview/master/YouTubePreview.user.js
-// @version      0.4
+// @version      0.5
 // @description  A userscript to play youtube videos by hovering over their thumbnails.
 // @match        *://*.youtube.com/*
 // @run-at       document-end
-// @grant        GM_addStyle
+// @grant        none
 // ==/UserScript==
 
 var APIready = new Promise(function(resolve) {
-    onYouTubeIframeAPIReady = resolve;
+    window.onYouTubeIframeAPIReady = resolve;
 });
 
 (function() {
     'use strict';
-
-    GM_addStyle(".player-api { z-index: 1 !important; }");
-    GM_addStyle(".yt-lockup-thumbnail,.thumb-wrapper { " +
-        "-webkit-transition: all 200ms ease-in !important; " +
-        "-webkit-transform: scale(1) !important; " +
-        "-ms-transition: all 200ms ease-in !important; " +
-        "-ms-transform: scale(1) !important; " +
-        "-moz-transition: all 200ms ease-in !important; " +
-        "-moz-transform: scale(1) !important; " +
-        "transition: all 200ms ease-in !important; " +
-        "transform: scale(1) !important; " +
-        "}");
-    GM_addStyle(".yt-lockup-thumbnail:hover,.thumb-wrapper:hover { " +
-        "z-index: 9999999999; " +
-        "box-shadow: 0px 0px 100px #000000 !important; " +
-        "-webkit-transition: all 200ms ease-in !important; " +
-        "-webkit-transform: scale(2.0) !important; " +
-        "-ms-transition: all 200ms ease-in !important; " +
-        "-ms-transform: scale(2.0) !important; " +
-        "-moz-transition: all 200ms ease-in !important; " +
-        "-moz-transform: scale(2.0) !important; " +
-        "transition: all 200ms ease-in !important; " +
-        "transform: scale(2.0) !important; " +
-        "}");
-    GM_addStyle(".yt-thumb.video-thumb, .yt-uix-simple-thumb-wrap.yt-uix-simple-thumb-related { " +
-        "background-color: black !important; " +
-    "}");
-    GM_addStyle(".xspinner { " +
-        "position: absolute; " +
-        "top: 0; " +
-        "right: 0; " +
-        "bottom: 0; " +
-        "left: 0; " +
-        "background: rgba(255,255,255,0.5); " +
-        "font-size: 14px; " +
-        "text-align: center; " +
-        "line-height: 2; " +
-        "color: rgb(0,0,0); " +
-        "font-weight: bold; " +
-        "}");
 
     function init() {
         // requesting api
@@ -63,6 +23,52 @@ var APIready = new Promise(function(resolve) {
         scriptTag.src = "https://www.youtube.com/iframe_api";
         var firstScriptTag = document.getElementsByTagName('script')[0];
         firstScriptTag.parentNode.insertBefore(scriptTag, firstScriptTag);
+
+        addGlobalStyle(
+            ".player-api { z-index: 1 !important; } " +
+
+            ".yt-lockup-thumbnail,.thumb-wrapper { " +
+            "-webkit-transition: all 200ms ease-in !important; " +
+            "-webkit-transform: scale(1) !important; " +
+            "-ms-transition: all 200ms ease-in !important; " +
+            "-ms-transform: scale(1) !important; " +
+            "-moz-transition: all 200ms ease-in !important; " +
+            "-moz-transform: scale(1) !important; " +
+            "transition: all 200ms ease-in !important; " +
+            "transform: scale(1) !important; " +
+            "} " +
+
+            ".yt-lockup-thumbnail:hover,.thumb-wrapper:hover { " +
+            "z-index: 9999999999; " +
+            "box-shadow: 0px 0px 100px #000000 !important; " +
+            "-webkit-transition: all 200ms ease-in !important; " +
+            "-webkit-transform: scale(2.0) !important; " +
+            "-ms-transition: all 200ms ease-in !important; " +
+            "-ms-transform: scale(2.0) !important; " +
+            "-moz-transition: all 200ms ease-in !important; " +
+            "-moz-transform: scale(2.0) !important; " +
+            "transition: all 200ms ease-in !important; " +
+            "transform: scale(2.0) !important; " +
+            "} " +
+
+            ".yt-thumb.video-thumb, .yt-uix-simple-thumb-wrap.yt-uix-simple-thumb-related { " +
+            "background-color: black !important; " +
+            "} " +
+
+            ".xspinner { " +
+            "pointer-events: none; " +
+            "position: absolute; " +
+            "top: 0; " +
+            "right: 0; " +
+            "bottom: 0; " +
+            "left: 0; " +
+            "background: rgba(255,255,255,0.5); " +
+            "font-size: 14px; " +
+            "text-align: center; " +
+            "line-height: 2; " +
+            "color: rgb(0,0,0); " +
+            "font-weight: bold; " +
+            "} ");
 
         initOn(document);
         var mo = new MutationObserver(function(muts) {
@@ -152,6 +158,7 @@ var APIready = new Promise(function(resolve) {
                         thumbnail.PPlayer = new Promise(function (resolve) {
                             var playerTag = document.createElement('div');
                             playerTag.id = vidId;
+                            playerTag.style.pointerEvents = 'none';
                             playerTag.style.position = 'absolute';
                             playerTag.style.zIndex = '1';
                             childThumb.insertBefore(playerTag, childThumb.firstChild);
@@ -197,7 +204,7 @@ var APIready = new Promise(function(resolve) {
             thumbnail.parentNode.addEventListener('mouseout', function(evt) {
                 if(!thumbnail.overlocker) return;
                 thumbnail.overlocker.then(function () {
-                    if(thumbnail.contains(evt.toElement)) return;
+                    if(thumbnail.contains(evt.relatedTarget)) return;
                     if(thumbnail.watchedContainer) {
                         for (var i = 0; i < thumbnail.watchedContainer.length; i++)
                             thumbnail.watchedContainer[i].classList.add('watched');
@@ -293,6 +300,15 @@ var APIready = new Promise(function(resolve) {
             });
             xhr.send();
         });
+    }
+
+    function addGlobalStyle(css) {
+        var head = document.getElementsByTagName('head')[0];
+        if (!head) { return; }
+        var style = document.createElement('style');
+        style.type = 'text/css';
+        style.innerHTML = css;
+        head.appendChild(style);
     }
 
     init();
