@@ -1,9 +1,10 @@
 // ==UserScript==
 // @name         YouTube Preview
+// @author       sooqua
 // @namespace    https://github.com/sooqua/
 // @downloadURL  https://raw.githubusercontent.com/sooqua/YouTube-Preview/master/YouTubePreview.user.js
-// @version      0.3
-// @description  Preview youtube thumbnail
+// @version      0.4
+// @description  A userscript to play youtube videos by hovering over their thumbnails.
 // @match        *://*.youtube.com/*
 // @run-at       document-end
 // @grant        GM_addStyle
@@ -28,7 +29,7 @@ var APIready = new Promise(function(resolve) {
         "transform: scale(1) !important; " +
         "}");
     GM_addStyle(".yt-lockup-thumbnail:hover,.thumb-wrapper:hover { " +
-        "z-index: 2147483647 !important; " +
+        "z-index: 9999999999; " +
         "box-shadow: 0px 0px 100px #000000 !important; " +
         "-webkit-transition: all 200ms ease-in !important; " +
         "-webkit-transform: scale(2.0) !important; " +
@@ -38,6 +39,22 @@ var APIready = new Promise(function(resolve) {
         "-moz-transform: scale(2.0) !important; " +
         "transition: all 200ms ease-in !important; " +
         "transform: scale(2.0) !important; " +
+        "}");
+    GM_addStyle(".yt-thumb.video-thumb, .yt-uix-simple-thumb-wrap.yt-uix-simple-thumb-related { " +
+        "background-color: black !important; " +
+    "}");
+    GM_addStyle(".xspinner { " +
+        "position: absolute; " +
+        "top: 0; " +
+        "right: 0; " +
+        "bottom: 0; " +
+        "left: 0; " +
+        "background: rgba(255,255,255,0.5); " +
+        "font-size: 14px; " +
+        "text-align: center; " +
+        "line-height: 2; " +
+        "color: rgb(0,0,0); " +
+        "font-weight: bold; " +
         "}");
 
     function init() {
@@ -65,34 +82,30 @@ var APIready = new Promise(function(resolve) {
 
             thumbnail.parentNode.addEventListener('mouseover', function() {
                 if(thumbnail.overlocker) return;
-                thumbnail.overlocker = new Promise(function (resolve) {
+                thumbnail.overlocker = new Promise(function (unlock) {
                     var spinner = document.createElement('div');
-                    spinner.style.position = 'absolute';
-                    spinner.style.top = '0';
-                    spinner.style.right = '0';
-                    spinner.style.bottom = '0';
-                    spinner.style.left = '0';
-                    spinner.style.background = 'rgba(255,255,255,0.5)';
-                    spinner.style.fontSize = '14px';
-                    spinner.style.textAlign = 'center';
-                    spinner.style.lineHeight = '2';
-                    spinner.style.color = 'rgb(0,0,0)';
-                    spinner.style.fontWeight = 'bold';
+                    spinner.className = 'xspinner';
                     spinner.textContent = 'Loading...';
 
                     var childThumb = thumbnail.querySelector('.yt-thumb.video-thumb, .yt-uix-simple-thumb-wrap.yt-uix-simple-thumb-related');
                     childThumb.appendChild(spinner);
 
-                    thumbnail.watchedContainer = []; thumbnail.watchedBadgeContainer = [];
-                    for (var el = thumbnail.parentElement; el; el = el.parentElement) {
+                    thumbnail.watchedContainer = [];
+                    for (var el = thumbnail; el; el = el.parentElement) {
                         if (el.classList.contains('watched')) {
                             thumbnail.watchedContainer.push(el);
                             el.classList.remove('watched');
                         }
                     }
-                    [].forEach.call(thumbnail.querySelectorAll('.watched-badge'), function (watchedBadge) {
+                    thumbnail.watchedBadgeContainer = [];
+                    [].forEach.call(thumbnail.parentNode.querySelectorAll('.watched-badge'), function (watchedBadge) {
                         thumbnail.watchedBadgeContainer.push(watchedBadge);
                         watchedBadge.style.display = 'none';
+                    });
+                    thumbnail.imageContainer = [];
+                    [].forEach.call(thumbnail.getElementsByTagName('img'), function(img) {
+                        thumbnail.imageContainer.push(img);
+                        img.style.opacity = 0;
                     });
 
                     var vidId = thumbnail.href.split('v=')[1];
@@ -102,30 +115,36 @@ var APIready = new Promise(function(resolve) {
                             var HPlayer = document.createElement('video');
                             HPlayer.style.position = 'absolute';
                             HPlayer.style.width = childThumb.offsetWidth + 'px';
+                            HPlayer.style.height = childThumb.offsetHeight + 'px';
                             HPlayer.style.zIndex = '1';
                             HPlayer.controls = false;
                             HPlayer.autoplay = true;
-                            var source = document.createElement("source");
-                            source.type = "video/mp4";
                             for (var i = 0; i < links.length; i++) {
-                                if (links[i].quality == "medium" && links[i].filetype == "mp4") {
-                                    source.src = links[i].src;
+                                if (links[i].quality === "medium" && links[i].filetype === "mp4") {
+                                    HPlayer.src = links[i].src;
                                     break;
                                 }
                             }
                             HPlayer.onloadedmetadata = resolve(HPlayer);
-                            HPlayer.appendChild(source);
                             childThumb.insertBefore(HPlayer, childThumb.firstChild);
                         });
                         thumbnail.HPlayer.then(function (HPlayer) {
                             childThumb.removeChild(spinner);
 
                             thumbnail.parentNode.addEventListener('mousemove', function (evt) {
-                                if (HPlayer.readyState == 4)
-                                    HPlayer.currentTime = HPlayer.duration * evt.offsetX / thumbnail.parentNode.offsetWidth;
+                                if (!HPlayer) return;
+                                if (HPlayer.readyState === 4) {
+                                    if(thumbnail.lastX !== evt.screenX || thumbnail.lastY !== evt.screenY) {
+                                        HPlayer.currentTime = HPlayer.duration * evt.offsetX / thumbnail.parentElement.offsetWidth;
+                                        if(HPlayer.paused)
+                                            HPlayer.play();
+                                    }
+                                    thumbnail.lastX = evt.screenX;
+                                    thumbnail.lastY = evt.screenY;
+                                }
                             });
 
-                            resolve();
+                            unlock();
                         });
 
                     }).catch(function () {
@@ -143,7 +162,8 @@ var APIready = new Promise(function(resolve) {
                                     videoId: vidId,
                                     playerVars: {
                                         'enablejsapi': 1, 'autoplay': 1, 'showinfo': 0, 'controls': 0,
-                                        'modestbranding': 1, 'ps': 'docs'
+                                        'modestbranding': 1, 'ps': 'docs', 'iv_load_policy': 3, 'rel': 0,
+                                        'vq': 'medium'
                                     },
                                     events: {
                                         'onReady': function () {
@@ -158,41 +178,65 @@ var APIready = new Promise(function(resolve) {
 
                             thumbnail.parentNode.addEventListener('mousemove', function (evt) {
                                 if (!PPlayer) return;
-                                PPlayer.seekTo(PPlayer.getDuration() * evt.offsetX / thumbnail.parentNode.offsetWidth, true);
+                                if(thumbnail.lastX !== evt.screenX || thumbnail.lastY !== evt.screenY) {
+                                    try {
+                                        PPlayer.seekTo(PPlayer.getDuration() * evt.offsetX / thumbnail.parentElement.offsetWidth, true);
+                                    } catch (e) {}
+                                }
+                                thumbnail.lastX = evt.screenX;
+                                thumbnail.lastY = evt.screenY;
                             });
 
-                            resolve();
+                            unlock();
                         });
 
                     });
                 });
             });
 
-            thumbnail.parentNode.addEventListener('mouseout', function() {
+            thumbnail.parentNode.addEventListener('mouseout', function(evt) {
                 if(!thumbnail.overlocker) return;
                 thumbnail.overlocker.then(function () {
-                    for(var i = 0; thumbnail.watchedContainer && i < thumbnail.watchedContainer.length; i++)
-                        thumbnail.watchedContainer[i].classList.add('watched');
-                    thumbnail.watchedContainer = null;
-                    for(i = 0; thumbnail.watchedBadgeContainer && i < thumbnail.watchedBadgeContainer.length; i++)
-                        thumbnail.watchedBadgeContainer[i].style.display = null;
-                    thumbnail.watchedBadgeContainer = null;
+                    if(thumbnail.contains(evt.toElement)) return;
+                    if(thumbnail.watchedContainer) {
+                        for (var i = 0; i < thumbnail.watchedContainer.length; i++)
+                            thumbnail.watchedContainer[i].classList.add('watched');
+                        thumbnail.watchedContainer = null;
+                    }
+                    if(thumbnail.watchedBadgeContainer) {
+                        for (var i = 0; i < thumbnail.watchedBadgeContainer.length; i++)
+                            thumbnail.watchedBadgeContainer[i].style.display = null;
+                        thumbnail.watchedBadgeContainer = null;
+                    }
+                    if(thumbnail.imageContainer) {
+                        for (var i = 0; i < thumbnail.imageContainer.length; i++)
+                            thumbnail.imageContainer[i].style.opacity = null;
+                        thumbnail.imageContainer = null;
+                    }
 
                     if(thumbnail.PPlayer) {
                         thumbnail.PPlayer.then(function(PPlayer) {
-                            if(PPlayer.a)
+                            if(PPlayer.a.parentNode)
                                 PPlayer.a.parentNode.removeChild(PPlayer.a);
                             thumbnail.PPlayer = null;
+                            thumbnail.overlocker = null;
                         });
                     }
-                    if(thumbnail.HPlayer) {
+                    else if(thumbnail.HPlayer) {
                         thumbnail.HPlayer.then(function (HPlayer) {
-                            if(HPlayer)
+                            HPlayer.pause();
+                            HPlayer.src='';
+                            HPlayer.load();
+                            if(HPlayer.parentNode) {
                                 HPlayer.parentNode.removeChild(HPlayer);
-                            HPlayer = null;
+                            }
+                            thumbnail.HPlayer = null;
+                            thumbnail.overlocker = null;
                         });
                     }
-                    thumbnail.overlocker = null;
+                    else {
+                        thumbnail.overlocker = null;
+                    }
                 });
             });
 
