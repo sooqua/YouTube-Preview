@@ -3,7 +3,7 @@
 // @author       sooqua
 // @namespace    https://github.com/sooqua/
 // @downloadURL  https://raw.githubusercontent.com/sooqua/YouTube-Preview/master/YouTubePreview.user.js
-// @version      0.6
+// @version      0.7
 // @description  A userscript to play youtube videos by hovering over their thumbnails.
 // @match        *://*.youtube.com/*
 // @run-at       document-end
@@ -159,7 +159,7 @@ var APIready = new Promise(function(resolve) {
                                         'vq': 'medium'
                                     },
                                     events: {
-                                        'onReady': function() { resolve(pplayer) }
+                                        'onReady': function() { resolve(pplayer); }
                                     }
                                 });
                             });
@@ -176,7 +176,7 @@ var APIready = new Promise(function(resolve) {
             thumbnail.parentNode.addEventListener('mousemove', function(evt) {
                 if (thumbnail.spinner) return;
 
-                if(thumbnail.lastX !== evt.screenX || thumbnail.lastY !== evt.screenY) {
+                if(thumbnail.lastX !== evt.screenX) {
                     var offsetX = evt.offsetX || evt.layerX - thumbnail.offsetLeft;
 
                     if(thumbnail.PPlayer) {
@@ -197,7 +197,6 @@ var APIready = new Promise(function(resolve) {
                     }
                 }
                 thumbnail.lastX = evt.screenX;
-                thumbnail.lastY = evt.screenY;
             });
 
             thumbnail.parentNode.addEventListener('mouseout', function(evt) {
