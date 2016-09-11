@@ -3,7 +3,7 @@
 // @author       sooqua
 // @namespace    https://github.com/sooqua/
 // @downloadURL  https://raw.githubusercontent.com/sooqua/YouTube-Preview/master/YouTubePreview.user.js
-// @version      0.5
+// @version      0.6
 // @description  A userscript to play youtube videos by hovering over their thumbnails.
 // @match        *://*.youtube.com/*
 // @run-at       document-end
@@ -119,6 +119,7 @@ var APIready = new Promise(function(resolve) {
                         // video not ciphered, creating simple html5 player
                         thumbnail.HPlayer = new Promise(function (resolve) {
                             var HPlayer = document.createElement('video');
+                            HPlayer.onloadedmetadata = resolve(HPlayer);
                             HPlayer.style.position = 'absolute';
                             HPlayer.style.width = childThumb.offsetWidth + 'px';
                             HPlayer.style.height = childThumb.offsetHeight + 'px';
@@ -131,25 +132,10 @@ var APIready = new Promise(function(resolve) {
                                     break;
                                 }
                             }
-                            HPlayer.onloadedmetadata = resolve(HPlayer);
                             childThumb.insertBefore(HPlayer, childThumb.firstChild);
                         });
-                        thumbnail.HPlayer.then(function (HPlayer) {
+                        thumbnail.HPlayer.then(function () {
                             childThumb.removeChild(spinner);
-
-                            thumbnail.parentNode.addEventListener('mousemove', function (evt) {
-                                if (!HPlayer) return;
-                                if (HPlayer.readyState === 4) {
-                                    if(thumbnail.lastX !== evt.screenX || thumbnail.lastY !== evt.screenY) {
-                                        HPlayer.currentTime = HPlayer.duration * evt.offsetX / thumbnail.parentElement.offsetWidth;
-                                        if(HPlayer.paused)
-                                            HPlayer.play();
-                                    }
-                                    thumbnail.lastX = evt.screenX;
-                                    thumbnail.lastY = evt.screenY;
-                                }
-                            });
-
                             unlock();
                         });
 
@@ -173,32 +159,45 @@ var APIready = new Promise(function(resolve) {
                                         'vq': 'medium'
                                     },
                                     events: {
-                                        'onReady': function () {
-                                            resolve(pplayer);
-                                        }
+                                        'onReady': function() { resolve(pplayer) }
                                     }
                                 });
                             });
                         });
-                        thumbnail.PPlayer.then(function (PPlayer) {
+                        thumbnail.PPlayer.then(function () {
                             childThumb.removeChild(spinner);
-
-                            thumbnail.parentNode.addEventListener('mousemove', function (evt) {
-                                if (!PPlayer) return;
-                                if(thumbnail.lastX !== evt.screenX || thumbnail.lastY !== evt.screenY) {
-                                    try {
-                                        PPlayer.seekTo(PPlayer.getDuration() * evt.offsetX / thumbnail.parentElement.offsetWidth, true);
-                                    } catch (e) {}
-                                }
-                                thumbnail.lastX = evt.screenX;
-                                thumbnail.lastY = evt.screenY;
-                            });
-
                             unlock();
                         });
 
                     });
                 });
+            });
+
+            thumbnail.parentNode.addEventListener('mousemove', function(evt) {
+                if (thumbnail.spinner) return;
+
+                if(thumbnail.lastX !== evt.screenX || thumbnail.lastY !== evt.screenY) {
+                    var offsetX = evt.offsetX || evt.layerX - thumbnail.offsetLeft;
+
+                    if(thumbnail.PPlayer) {
+                        thumbnail.PPlayer.then(function (PPlayer) {
+                            try {
+                                PPlayer.seekTo(PPlayer.getDuration() * offsetX / thumbnail.parentElement.offsetWidth, true);
+                            } catch (e){}
+                        });
+                    }
+                    else if(thumbnail.HPlayer) {
+                        thumbnail.HPlayer.then(function (HPlayer) {
+                            if (HPlayer.readyState !== 0) {
+                                HPlayer.currentTime = HPlayer.duration * offsetX / thumbnail.parentElement.offsetWidth;
+                                if (HPlayer.paused)
+                                    HPlayer.play();
+                            }
+                        });
+                    }
+                }
+                thumbnail.lastX = evt.screenX;
+                thumbnail.lastY = evt.screenY;
             });
 
             thumbnail.parentNode.addEventListener('mouseout', function(evt) {
