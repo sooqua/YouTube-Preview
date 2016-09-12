@@ -3,7 +3,7 @@
 // @author       sooqua
 // @namespace    https://github.com/sooqua/
 // @downloadURL  https://raw.githubusercontent.com/sooqua/YouTube-Preview/master/YouTubePreview.user.js
-// @version      0.7
+// @version      0.8
 // @description  A userscript to play youtube videos by hovering over their thumbnails.
 // @match        *://*.youtube.com/*
 // @run-at       document-end
@@ -25,13 +25,13 @@ var APIready = new Promise(function(resolve) {
         firstScriptTag.parentNode.insertBefore(scriptTag, firstScriptTag);
 
         addGlobalStyle(
-            ".player-api { z-index: 1 !important; } " +
+            ".watch-sidebar-section { " +
+            "z-index: auto !important; " +
+            "} " +
 
             ".yt-lockup-thumbnail,.thumb-wrapper { " +
             "-webkit-transition: all 200ms ease-in !important; " +
             "-webkit-transform: scale(1) !important; " +
-            "-ms-transition: all 200ms ease-in !important; " +
-            "-ms-transform: scale(1) !important; " +
             "-moz-transition: all 200ms ease-in !important; " +
             "-moz-transform: scale(1) !important; " +
             "transition: all 200ms ease-in !important; " +
@@ -39,12 +39,10 @@ var APIready = new Promise(function(resolve) {
             "} " +
 
             ".yt-lockup-thumbnail:hover,.thumb-wrapper:hover { " +
-            "z-index: 9999999999; " +
+            "z-index: 9999999999 !important; " +
             "box-shadow: 0px 0px 100px #000000 !important; " +
             "-webkit-transition: all 200ms ease-in !important; " +
             "-webkit-transform: scale(2.0) !important; " +
-            "-ms-transition: all 200ms ease-in !important; " +
-            "-ms-transform: scale(2.0) !important; " +
             "-moz-transition: all 200ms ease-in !important; " +
             "-moz-transform: scale(2.0) !important; " +
             "transition: all 200ms ease-in !important; " +
@@ -89,6 +87,18 @@ var APIready = new Promise(function(resolve) {
             thumbnail.parentNode.addEventListener('mouseover', function() {
                 if(thumbnail.overlocker) return;
                 thumbnail.overlocker = new Promise(function (unlock) {
+                    var rect = thumbnail.parentElement.getBoundingClientRect();
+                    var farRight = (rect.right + thumbnail.parentElement.clientWidth/2.0) > window.innerWidth;
+                    var farDown = (rect.bottom + thumbnail.parentElement.clientHeight/2.0) > window.innerHeight;
+                    var farLeft = (rect.left - thumbnail.parentElement.clientWidth/2.0) < 0;
+                    var farUp = (rect.top - thumbnail.parentElement.clientHeight/2.0) < 0;
+                    if(farRight || farDown || farLeft || farUp) {
+                        var transformOrig = (farRight ? 'right ':'') + (farDown ? 'bottom ':'') + (farLeft ? 'left ':'') + (farUp ? 'top ':'');
+                        thumbnail.parentElement.style.webkitTransformOrigin = transformOrig;
+                        thumbnail.parentElement.style.mozTransformOrigin = transformOrig;
+                        thumbnail.parentElement.style.transformOrigin = transformOrig;
+                    }
+
                     var spinner = document.createElement('div');
                     spinner.className = 'xspinner';
                     spinner.textContent = 'Loading...';
@@ -123,7 +133,6 @@ var APIready = new Promise(function(resolve) {
                             HPlayer.style.position = 'absolute';
                             HPlayer.style.width = childThumb.offsetWidth + 'px';
                             HPlayer.style.height = childThumb.offsetHeight + 'px';
-                            HPlayer.style.zIndex = '1';
                             HPlayer.controls = false;
                             HPlayer.autoplay = true;
                             for (var i = 0; i < links.length; i++) {
@@ -146,7 +155,6 @@ var APIready = new Promise(function(resolve) {
                             playerTag.id = vidId;
                             playerTag.style.pointerEvents = 'none';
                             playerTag.style.position = 'absolute';
-                            playerTag.style.zIndex = '1';
                             childThumb.insertBefore(playerTag, childThumb.firstChild);
                             APIready.then(function () {
                                 var pplayer = new YT.Player(playerTag.id, {
@@ -202,7 +210,11 @@ var APIready = new Promise(function(resolve) {
             thumbnail.parentNode.addEventListener('mouseout', function(evt) {
                 if(!thumbnail.overlocker) return;
                 thumbnail.overlocker.then(function () {
-                    if(thumbnail.contains(evt.relatedTarget)) return;
+                    if(evt.relatedTarget) {
+                        if (thumbnail.parentElement.contains(evt.relatedTarget)) return;
+                        if (evt.relatedTarget.className.indexOf('yt-uix-tooltip-tip') !== -1) return;
+                    }
+
                     if(thumbnail.watchedContainer) {
                         for (var i = 0; i < thumbnail.watchedContainer.length; i++)
                             thumbnail.watchedContainer[i].classList.add('watched');
