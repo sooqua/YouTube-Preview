@@ -3,7 +3,7 @@
 // @author       sooqua
 // @namespace    https://github.com/sooqua/
 // @downloadURL  https://raw.githubusercontent.com/sooqua/YouTube-Preview/master/YouTubePreview.user.js
-// @version      0.8
+// @version      0.9
 // @description  A userscript to play youtube videos by hovering over their thumbnails.
 // @match        *://*.youtube.com/*
 // @run-at       document-end
@@ -29,7 +29,7 @@ var APIready = new Promise(function(resolve) {
             "z-index: auto !important; " +
             "} " +
 
-            ".yt-lockup-thumbnail,.thumb-wrapper { " +
+            ".yt-lockup-thumbnail:not(.yt-pl-thumb),.thumb-wrapper { " +
             "-webkit-transition: all 200ms ease-in !important; " +
             "-webkit-transform: scale(1) !important; " +
             "-moz-transition: all 200ms ease-in !important; " +
@@ -38,7 +38,7 @@ var APIready = new Promise(function(resolve) {
             "transform: scale(1) !important; " +
             "} " +
 
-            ".yt-lockup-thumbnail:hover,.thumb-wrapper:hover { " +
+            ".yt-lockup-thumbnail:not(.yt-pl-thumb):hover,.thumb-wrapper:hover { " +
             "z-index: 9999999999 !important; " +
             "box-shadow: 0px 0px 100px #000000 !important; " +
             "-webkit-transition: all 200ms ease-in !important; " +
@@ -125,58 +125,31 @@ var APIready = new Promise(function(resolve) {
                     });
 
                     var vidId = thumbnail.href.split('v=')[1];
-                    loadLinks(vidId).then(function (links) {
-                        // video not ciphered, creating simple html5 player
-                        thumbnail.HPlayer = new Promise(function (resolve) {
-                            var HPlayer = document.createElement('video');
-                            HPlayer.onloadedmetadata = resolve(HPlayer);
-                            HPlayer.style.position = 'absolute';
-                            HPlayer.style.width = childThumb.offsetWidth + 'px';
-                            HPlayer.style.height = childThumb.offsetHeight + 'px';
-                            HPlayer.controls = false;
-                            HPlayer.autoplay = true;
-                            for (var i = 0; i < links.length; i++) {
-                                if (links[i].quality === "medium" && links[i].filetype === "mp4") {
-                                    HPlayer.src = links[i].src;
-                                    break;
+                    thumbnail.PPlayer = new Promise(function (resolve) {
+                        var playerTag = document.createElement('div');
+                        playerTag.id = vidId;
+                        playerTag.style.pointerEvents = 'none';
+                        playerTag.style.position = 'absolute';
+                        childThumb.insertBefore(playerTag, childThumb.firstChild);
+                        APIready.then(function () {
+                            var pplayer = new YT.Player(playerTag.id, {
+                                width: childThumb.offsetWidth,
+                                height: childThumb.offsetHeight,
+                                videoId: vidId,
+                                playerVars: {
+                                    'enablejsapi': 1, 'autoplay': 1, 'showinfo': 0, 'controls': 0,
+                                    'modestbranding': 1, 'ps': 'docs', 'iv_load_policy': 3, 'rel': 0,
+                                    'vq': 'medium'
+                                },
+                                events: {
+                                    'onReady': function() { resolve(pplayer); }
                                 }
-                            }
-                            childThumb.insertBefore(HPlayer, childThumb.firstChild);
-                        });
-                        thumbnail.HPlayer.then(function () {
-                            childThumb.removeChild(spinner);
-                            unlock();
-                        });
-
-                    }).catch(function () {
-                        // video is ciphered, loading youtube player
-                        thumbnail.PPlayer = new Promise(function (resolve) {
-                            var playerTag = document.createElement('div');
-                            playerTag.id = vidId;
-                            playerTag.style.pointerEvents = 'none';
-                            playerTag.style.position = 'absolute';
-                            childThumb.insertBefore(playerTag, childThumb.firstChild);
-                            APIready.then(function () {
-                                var pplayer = new YT.Player(playerTag.id, {
-                                    width: childThumb.offsetWidth,
-                                    height: childThumb.offsetHeight,
-                                    videoId: vidId,
-                                    playerVars: {
-                                        'enablejsapi': 1, 'autoplay': 1, 'showinfo': 0, 'controls': 0,
-                                        'modestbranding': 1, 'ps': 'docs', 'iv_load_policy': 3, 'rel': 0,
-                                        'vq': 'medium'
-                                    },
-                                    events: {
-                                        'onReady': function() { resolve(pplayer); }
-                                    }
-                                });
                             });
                         });
-                        thumbnail.PPlayer.then(function () {
-                            childThumb.removeChild(spinner);
-                            unlock();
-                        });
-
+                    });
+                    thumbnail.PPlayer.then(function () {
+                        childThumb.removeChild(spinner);
+                        unlock();
                     });
                 });
             });
@@ -192,15 +165,6 @@ var APIready = new Promise(function(resolve) {
                             try {
                                 PPlayer.seekTo(PPlayer.getDuration() * offsetX / thumbnail.parentElement.offsetWidth, true);
                             } catch (e){}
-                        });
-                    }
-                    else if(thumbnail.HPlayer) {
-                        thumbnail.HPlayer.then(function (HPlayer) {
-                            if (HPlayer.readyState !== 0) {
-                                HPlayer.currentTime = HPlayer.duration * offsetX / thumbnail.parentElement.offsetWidth;
-                                if (HPlayer.paused)
-                                    HPlayer.play();
-                            }
                         });
                     }
                 }
@@ -239,76 +203,12 @@ var APIready = new Promise(function(resolve) {
                             thumbnail.overlocker = null;
                         });
                     }
-                    else if(thumbnail.HPlayer) {
-                        thumbnail.HPlayer.then(function (HPlayer) {
-                            HPlayer.pause();
-                            HPlayer.src='';
-                            HPlayer.load();
-                            if(HPlayer.parentNode) {
-                                HPlayer.parentNode.removeChild(HPlayer);
-                            }
-                            thumbnail.HPlayer = null;
-                            thumbnail.overlocker = null;
-                        });
-                    }
                     else {
                         thumbnail.overlocker = null;
                     }
                 });
             });
 
-        });
-    }
-
-    function loadLinks(vidId) {
-        return new Promise(function(resolve, reject) {
-            var xhr = new XMLHttpRequest();
-            xhr.open('GET', 'https://www.youtube.com/get_video_info?video_id=' + vidId, true);
-            xhr.addEventListener('load', function () {
-                var result = [];
-                var input = xhr.responseText;
-                if (input.indexOf('status=fail') !== -1) {
-                    reject();
-                    return;
-                }
-                if (input.indexOf('use_cipher_signature=True') !== -1) {
-                    reject();
-                    return;
-                }
-                var token = 'url_encoded_fmt_stream_map';
-                input = input.split('&');
-                for (var i = 0; i < input.length; i++) {
-                    if (input[i].indexOf(token) === 0) {
-                        input = decodeURIComponent(input[i].substr(token.length + 1));
-                        input = input && input.split(',');
-                        break;
-                    }
-                }
-                if (input) {
-                    for (i = 0; i < input.length; i++) {
-                        var url = input[i].split('&');
-                        var obj = {};
-                        for (var j = 0; j < url.length; j++) {
-                            var pair = url[j].split('=');
-                            switch (pair[0]) {
-                                case 'quality':
-                                    obj.quality = decodeURIComponent(pair[1]);
-                                    break;
-                                case 'type':
-                                    obj.filetype = decodeURIComponent(pair[1]).split(';')[0];
-                                    obj.filetype = obj.filetype && obj.filetype.replace('video/', '');
-                                    break;
-                                case 'url':
-                                    obj.src = decodeURIComponent(pair[1]);
-                                    break;
-                            }
-                        }
-                        result.push(obj);
-                    }
-                }
-                resolve(result);
-            });
-            xhr.send();
         });
     }
 
