@@ -1,3 +1,3 @@
 # YouTube-Preview
-![alt tag](./gangnam style.png)  
-![alt tag](./gangnam style.gif)
+![alt text](./gangnam style.png)  
+![alt text](./gangnam style.gif)
